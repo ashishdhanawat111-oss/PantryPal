@@ -260,6 +260,7 @@ def get_structured_meal_suggestions(
             except ValueError:
 
                 pass
+
     expiry_priority_text = ""
 
     if (
@@ -282,8 +283,9 @@ def get_structured_meal_suggestions(
                 )
 
             expiry_priority_text += """
-Strongly prioritize these ingredients when creating
-the recipes so the user can use them before they expire.
+Prefer recipes that naturally use these ingredients.
+Do NOT force an expiring ingredient into a dish where
+it would taste strange or be unrealistic.
 """
 
         else:
@@ -294,34 +296,167 @@ within the next 3 days.
 """
 
     prompt = f"""
-You are PantryPal, a practical AI kitchen assistant.
+You are PantryPal, a practical home-cooking assistant.
 
-The user's pantry contains:
+Your job is to recommend meals that a normal person
+would realistically cook and enjoy.
+
+USER'S PANTRY:
 
 {pantry_text}
 
-The user wants:
+REQUEST:
 
 Meal type: {meal_type}
 Servings: {servings}
-Preference: {preference} 
+Preference: {preference}
 
 {expiry_priority_text}
 
-Recommend exactly 3 realistic dishes.
+Recommend exactly 3 realistic and recognizable dishes.
 
-IMPORTANT RULES:
+VERY IMPORTANT RECIPE RULES:
 
-1. Prioritize ingredients already in the pantry.
-2. Consider the available quantities.
-3. You may suggest a small number of missing ingredients.
-4. Never claim a missing ingredient is in the pantry.
-5. Use realistic ingredient quantities.
-6. Return ONLY valid JSON.
-7. Do not use markdown.
-8. Do not wrap the response in ```json.
-9. Use only these units:
-   kg, g, L, ml, pieces, packets, tbsp, tsp.
+1. Recommend familiar, realistic home-cooked dishes.
+   Do not invent unusual dishes or strange ingredient
+   combinations just to use pantry ingredients.
+
+2. Pantry ingredients should be the main basis of recipes,
+   but only combine ingredients that naturally belong
+   together in that dish.
+
+3. Use realistic quantities for exactly {servings} serving(s).
+   Think carefully about normal portion sizes before choosing
+   each quantity.
+
+4. Avoid excessive quantities. For example, a simple meal
+   for 2 people should normally not require hundreds of grams
+   of several different main ingredients unless appropriate.
+
+5. Never use more of a pantry ingredient than the user
+   currently has available.
+
+6. Prefer recipes requiring few missing ingredients.
+   If the pantry cannot make a complicated meal, recommend
+   a simpler realistic meal instead.
+
+7. Include ALL ingredients required to actually cook the dish.
+   This includes things such as oil, salt, water, spices,
+   seasonings and sauces when they are needed.
+
+8. Never mention an ingredient in the instructions unless
+   that ingredient also appears in the "ingredients" list.
+
+9. Do not write vague instructions such as:
+   "add spices",
+   "season as needed",
+   "cook normally",
+   or "prepare the mixture".
+
+   Instead, state what to add and approximately how much.
+
+10. Write instructions for a BEGINNER who may not know
+    how to cook.
+
+11. Instructions should explain the cooking process in a
+    clear order. Include useful details such as approximate
+    cooking time, heat level, or amount of water when needed.
+
+12. Keep the instructions reasonably short. They should be
+    detailed enough to cook the dish but not unnecessarily long.
+
+13. If an ingredient required for the recipe is not in the
+    pantry, include it in the ingredients list with
+    "available": false.
+
+14. Also include every unavailable required ingredient by
+    name in the "missing" array.
+
+15. If an ingredient exists in the pantry and enough quantity
+    is available, mark "available": true.
+
+16. Basic cooking ingredients are NOT automatically available.
+    If oil, salt, spices, sauces or similar ingredients are
+    not listed in the pantry, mark them unavailable.
+
+17. Water may be included as an ingredient when needed for
+    cooking. Water does not need to be present in the pantry
+    and should use ml or L.
+
+18. Respect the requested meal type and preference.
+
+19. When expiry priority is active, use an expiring ingredient
+    only when it naturally fits the dish. Never create a strange
+    recipe merely to consume it.
+
+20. Before returning the answer, mentally check each recipe:
+    - Is this a real and sensible dish?
+    - Are the quantities reasonable for {servings} serving(s)?
+    - Could a beginner follow these instructions?
+    - Is every ingredient mentioned in the instructions also
+      present in the ingredients list?
+    If not, correct the recipe before returning it.
+
+PORTION AND UNIT RULES:
+
+For normal meals serving 1 to 4 people:
+
+- Rice should normally be about 60 to 120 g per person.
+- Dal, chana and other pulses should normally be about
+  50 to 100 g per person.
+- Potato should normally be about 100 to 250 g per person.
+- Tomato should normally be about 50 to 200 g per person.
+- Other vegetables should normally be about
+  50 to 250 g per person.
+- Eggs should normally be about 1 to 3 pieces per person.
+- Cooking oil should normally be measured in tbsp or tsp.
+- Salt and spices should normally be measured in tsp,
+  not grams or kilograms.
+- Water should normally be measured in ml or L.
+
+These are approximate cooking guidelines, not targets.
+Use culinary judgment depending on the dish.
+
+For recipes serving 1 to 4 people, NEVER use kg for ordinary
+amounts of rice, dal, pulses, vegetables, spices or seasonings.
+Use g instead.
+
+NEVER use hundreds of grams of spices or masala.
+
+Before returning each recipe, verify that the quantities are
+reasonable for exactly {servings} serving(s).
+
+CRITICAL CONSISTENCY RULE:
+
+Read the final cooking instructions after writing them.
+Every food, spice, seasoning, oil, sauce or other ingredient
+mentioned in the instructions MUST appear in the ingredients
+array.
+
+If you mention onion, garlic, ginger, chilli, oil, salt,
+spices or anything else in the instructions, it MUST be
+listed as an ingredient.
+
+If it is not available in the pantry, set "available": false
+and include its name in "missing".
+
+ALLOWED UNITS ONLY:
+
+kg
+g
+L
+ml
+pieces
+packets
+tbsp
+tsp
+
+OUTPUT RULES:
+
+Return ONLY valid JSON.
+Do not write explanations before or after the JSON.
+Do not use markdown.
+Do not use ```json or code fences.
 
 Return exactly this structure:
 
@@ -341,10 +476,12 @@ Return exactly this structure:
             "missing": [
                 "Missing Ingredient"
             ],
-            "instructions": "Short cooking instructions"
+            "instructions": "Short practical cooking instructions."
         }}
     ]
 }}
+
+The "recipes" array MUST contain exactly 3 recipes.
 """
 
     response = ask_gemma(prompt)
@@ -369,14 +506,11 @@ Return exactly this structure:
         if "recipes" not in data:
             return None
 
+        if len(data["recipes"]) != 3:
+            return None
+
         return data
 
-    except Exception as error:
-
-        print("STRUCTURED AI ERROR:")
-        print(error)
-
-        print("\nRAW GEMMA RESPONSE:")
-        print(response)
+    except Exception:
 
         return None

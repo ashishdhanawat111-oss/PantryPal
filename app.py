@@ -596,6 +596,12 @@ if st.session_state.get(
         "🤖 Pal's Suggestions"
     )
 
+    st.caption(
+    "💡 Pal suggests meal ideas based on your pantry. "
+    "AI suggestions may need adjustments to taste "
+    "and portion size."
+)
+
     suggestion_data = st.session_state[
         "meal_suggestions"
     ]
@@ -675,23 +681,7 @@ if st.session_state.get(
                         == name.lower()
                     ):
 
-                        needed_in_pantry_unit = (
-                            convert_quantity(
-                                quantity,
-                                unit,
-                                pantry_unit
-                            )
-                        )
-
-                        if (
-                            needed_in_pantry_unit
-                            is not None
-                            and needed_in_pantry_unit
-                            <= pantry_quantity
-                        ):
-
-                            available = True
-
+                        available = True
                         break
 
                 if available:
@@ -707,8 +697,7 @@ if st.session_state.get(
                     )
 
                 st.write(
-                    f"{status} {name} — "
-                    f"{quantity} {unit}"
+                    f"{status} {name}"
                 )
 
             st.write(
@@ -737,42 +726,7 @@ if st.session_state.get(
                 instructions
             )
 
-            if st.button(
-                "💾 Save Recipe",
-                key=f"save_ai_recipe_{index}",
-                use_container_width=True
-            ):
 
-                ingredients_to_save = []
-
-                for ingredient in recipe_ingredients:
-
-                    ingredients_to_save.append({
-                        "name": ingredient.get(
-                            "name",
-                            "Ingredient"
-                        ),
-                        "quantity": ingredient.get(
-                            "quantity",
-                            0
-                        ),
-                        "unit": ingredient.get(
-                            "unit",
-                            "pieces"
-                        )
-                    })
-
-                add_recipe(
-                    recipe_name,
-                    int(recipe_servings),
-                    instructions,
-                    ingredients_to_save
-                )
-
-                st.success(
-                    f"'{recipe_name}' saved "
-                    f"to My Recipes! 📖"
-                )
 
     st.divider()
 
@@ -799,8 +753,7 @@ if st.session_state.get(
         st.info(
             "🍽️ **I Made Something**\n\n"
             "Tell Pal what you cooked and let AI "
-            "estimate what ingredients were used.\n\n"
-            "Coming next 👀"
+            "estimate what ingredients were used."
         )
     st.divider()
 
