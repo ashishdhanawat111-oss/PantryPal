@@ -38,7 +38,7 @@ def ask_gemma(message):
                     "content": message
                 }
             ],
-            max_tokens=300
+            max_tokens=1200
         )
 
         return response.choices[0].message.content
@@ -203,5 +203,114 @@ Return exactly this structure:
         return data
 
     except Exception:
+
+        return None
+
+
+def get_structured_meal_suggestions(
+    pantry_items,
+    meal_type,
+    servings,
+    preference
+):
+
+    if len(pantry_items) == 0:
+        return None
+
+    pantry_text = ""
+
+    for ingredient in pantry_items:
+
+        name = ingredient[1]
+        quantity = ingredient[2]
+        unit = ingredient[3]
+
+        pantry_text += (
+            f"- {name}: {quantity:g} {unit}\n"
+        )
+
+    prompt = f"""
+You are PantryPal, a practical AI kitchen assistant.
+
+The user's pantry contains:
+
+{pantry_text}
+
+The user wants:
+
+Meal type: {meal_type}
+Servings: {servings}
+Preference: {preference}
+
+Recommend exactly 3 realistic dishes.
+
+IMPORTANT RULES:
+
+1. Prioritize ingredients already in the pantry.
+2. Consider the available quantities.
+3. You may suggest a small number of missing ingredients.
+4. Never claim a missing ingredient is in the pantry.
+5. Use realistic ingredient quantities.
+6. Return ONLY valid JSON.
+7. Do not use markdown.
+8. Do not wrap the response in ```json.
+9. Use only these units:
+   kg, g, L, ml, pieces, packets, tbsp, tsp.
+
+Return exactly this structure:
+
+{{
+    "recipes": [
+        {{
+            "name": "Recipe Name",
+            "servings": {servings},
+            "ingredients": [
+                {{
+                    "name": "Ingredient",
+                    "quantity": 1,
+                    "unit": "pieces",
+                    "available": true
+                }}
+            ],
+            "missing": [
+                "Missing Ingredient"
+            ],
+            "instructions": "Short cooking instructions"
+        }}
+    ]
+}}
+"""
+
+    response = ask_gemma(prompt)
+
+    try:
+
+        cleaned_response = response.strip()
+
+        if cleaned_response.startswith("```json"):
+            cleaned_response = cleaned_response[7:]
+
+        elif cleaned_response.startswith("```"):
+            cleaned_response = cleaned_response[3:]
+
+        if cleaned_response.endswith("```"):
+            cleaned_response = cleaned_response[:-3]
+
+        data = json.loads(
+            cleaned_response.strip()
+        )
+
+        if "recipes" not in data:
+            return None
+
+        return data
+
+    except Exception as error:
+
+        print("STRUCTURED AI ERROR:")
+        print(error)
+
+        print("\nRAW GEMMA RESPONSE:")
+        print(response)
 
         return None

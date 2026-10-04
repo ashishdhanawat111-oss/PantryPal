@@ -25,6 +25,7 @@ from database import (
 
 from ai_service import (
     get_meal_suggestions,
+    get_structured_meal_suggestions,
     estimate_cooked_ingredients
 )
 
@@ -490,33 +491,214 @@ elif page == "🍳 Cook":
                 "Pal is checking your kitchen... 🍳"
             ):
 
-                suggestions = get_meal_suggestions(
+                suggestions = get_structured_meal_suggestions(
                     pantry_items,
                     meal_type,
                     servings,
                     preference
-                )
+                    )
 
-            st.session_state[
-                "meal_suggestions"
-            ] = suggestions
+                if suggestions is None:
+
+                    st.error(
+                        "Pal couldn't create the meal suggestions. "
+                        "Please try again."
+                    )
+
+                else:
+
+                    st.session_state[
+                        "meal_suggestions"
+                    ] = suggestions
 
     # Keep AI result visible after Streamlit reruns
-    if st.session_state.get(
+if st.session_state.get(
+    "meal_suggestions"
+):
+
+    st.divider()
+
+    st.subheader(
+        "🤖 Pal's Suggestions"
+    )
+
+    suggestion_data = st.session_state[
         "meal_suggestions"
-    ):
+    ]
 
-        st.divider()
+    recipes = suggestion_data.get(
+        "recipes",
+        []
+    )
 
-        st.subheader(
-            "🤖 Pal's Suggestions"
+    for index, recipe in enumerate(recipes):
+
+        recipe_name = recipe.get(
+            "name",
+            "Recipe"
         )
 
-        st.markdown(
-            st.session_state[
-                "meal_suggestions"
-            ]
+        recipe_servings = recipe.get(
+            "servings",
+            servings
         )
+
+        recipe_ingredients = recipe.get(
+            "ingredients",
+            []
+        )
+
+        missing_ingredients = []
+
+        instructions = recipe.get(
+            "instructions",
+            "No instructions provided."
+        )
+
+        with st.container(border=True):
+
+            st.subheader(
+                f"🍳 {recipe_name}"
+            )
+
+            st.caption(
+                f"👥 {recipe_servings} servings"
+            )
+
+            st.write(
+                "**🥕 Ingredients**"
+            )
+
+            for ingredient in recipe_ingredients:
+
+                name = ingredient.get(
+                    "name",
+                    "Ingredient"
+                )
+
+                quantity = ingredient.get(
+                    "quantity",
+                    0
+                )
+
+                unit = ingredient.get(
+                    "unit",
+                    ""
+                )
+
+                available = False
+
+                pantry_items = get_ingredients()
+
+                for pantry_item in pantry_items:
+
+                    pantry_name = pantry_item[1]
+                    pantry_quantity = pantry_item[2]
+                    pantry_unit = pantry_item[3]
+
+                    if (
+                        pantry_name.lower()
+                        == name.lower()
+                    ):
+
+                        needed_in_pantry_unit = (
+                            convert_quantity(
+                                quantity,
+                                unit,
+                                pantry_unit
+                            )
+                        )
+
+                        if (
+                            needed_in_pantry_unit
+                            is not None
+                            and needed_in_pantry_unit
+                            <= pantry_quantity
+                        ):
+
+                            available = True
+
+                        break
+
+                if available:
+
+                    status = "✅"
+
+                else:
+
+                    status = "🛒"
+
+                    missing_ingredients.append(
+                        name
+                    )
+
+                st.write(
+                    f"{status} {name} — "
+                    f"{quantity} {unit}"
+                )
+
+            st.write(
+                "**🛒 Missing Ingredients**"
+            )
+
+            if len(missing_ingredients) == 0:
+
+                st.write(
+                    "✅ Nothing missing!"
+                )
+
+            else:
+
+                for missing in missing_ingredients:
+
+                    st.write(
+                        f"• {missing}"
+                    )
+
+            st.write(
+                "**👨‍🍳 Quick Method**"
+            )
+
+            st.write(
+                instructions
+            )
+
+            if st.button(
+                "💾 Save Recipe",
+                key=f"save_ai_recipe_{index}",
+                use_container_width=True
+            ):
+
+                ingredients_to_save = []
+
+                for ingredient in recipe_ingredients:
+
+                    ingredients_to_save.append({
+                        "name": ingredient.get(
+                            "name",
+                            "Ingredient"
+                        ),
+                        "quantity": ingredient.get(
+                            "quantity",
+                            0
+                        ),
+                        "unit": ingredient.get(
+                            "unit",
+                            "pieces"
+                        )
+                    })
+
+                add_recipe(
+                    recipe_name,
+                    int(recipe_servings),
+                    instructions,
+                    ingredients_to_save
+                )
+
+                st.success(
+                    f"'{recipe_name}' saved "
+                    f"to My Recipes! 📖"
+                )
 
     st.divider()
 
