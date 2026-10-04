@@ -466,6 +466,80 @@ elif page == "🍳 Cook":
         ]
     )
 
+    if (
+        preference
+        == "Use ingredients that may expire soon"
+    ):
+
+        pantry_items = get_ingredients()
+
+        expiring_items = []
+
+        for ingredient in pantry_items:
+
+            name = ingredient[1]
+            expiry_date = ingredient[6]
+
+            if expiry_date:
+
+                try:
+
+                    expiry = datetime.strptime(
+                        expiry_date,
+                        "%Y-%m-%d"
+                    ).date()
+
+                    days_left = (
+                        expiry - date.today()
+                    ).days
+
+                    if 0 <= days_left <= 3:
+
+                        expiring_items.append({
+                            "name": name,
+                            "days_left": days_left
+                        })
+
+                except ValueError:
+
+                    pass
+
+        if len(expiring_items) > 0:
+
+            for item in expiring_items:
+
+                if item["days_left"] == 0:
+
+                    expiry_message = (
+                        f"⚠️ **{item['name']} expires today!**"
+                    )
+
+                elif item["days_left"] == 1:
+
+                    expiry_message = (
+                        f"⚠️ **{item['name']} expires tomorrow!**"
+                    )
+
+                else:
+
+                    expiry_message = (
+                        f"⚠️ **{item['name']} expires in "
+                        f"{item['days_left']} days.**"
+                    )
+
+                st.warning(
+                    expiry_message
+                    + "\n\nPal will prioritize it "
+                    + "in your meal suggestions."
+                )
+
+        else:
+
+            st.info(
+                "✅ Nothing in your pantry expires "
+                "within the next 3 days."
+            )
+
     st.caption(
         "Pal will check your current pantry "
         "before suggesting meals."

@@ -3,6 +3,7 @@ import json
 
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
+from datetime import date, datetime
 
 
 # Load variables from the .env file
@@ -229,6 +230,69 @@ def get_structured_meal_suggestions(
             f"- {name}: {quantity:g} {unit}\n"
         )
 
+    expiring_soon = []
+
+    for ingredient in pantry_items:
+
+        name = ingredient[1]
+        expiry_date = ingredient[6]
+
+        if expiry_date:
+
+            try:
+
+                expiry = datetime.strptime(
+                    expiry_date,
+                    "%Y-%m-%d"
+                ).date()
+
+                days_left = (
+                    expiry - date.today()
+                ).days
+
+                if 0 <= days_left <= 3:
+
+                    expiring_soon.append({
+                        "name": name,
+                        "days_left": days_left
+                    })
+
+            except ValueError:
+
+                pass
+    expiry_priority_text = ""
+
+    if (
+        preference
+        == "Use ingredients that may expire soon"
+    ):
+
+        if len(expiring_soon) > 0:
+
+            expiry_priority_text = (
+                "\nPRIORITY INGREDIENTS:\n"
+            )
+
+            for item in expiring_soon:
+
+                expiry_priority_text += (
+                    f"- {item['name']} "
+                    f"(expires in "
+                    f"{item['days_left']} days)\n"
+                )
+
+            expiry_priority_text += """
+Strongly prioritize these ingredients when creating
+the recipes so the user can use them before they expire.
+"""
+
+        else:
+
+            expiry_priority_text = """
+There are currently no pantry ingredients expiring
+within the next 3 days.
+"""
+
     prompt = f"""
 You are PantryPal, a practical AI kitchen assistant.
 
@@ -240,7 +304,9 @@ The user wants:
 
 Meal type: {meal_type}
 Servings: {servings}
-Preference: {preference}
+Preference: {preference} 
+
+{expiry_priority_text}
 
 Recommend exactly 3 realistic dishes.
 
