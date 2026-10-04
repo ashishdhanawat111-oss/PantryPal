@@ -46,13 +46,74 @@ def ask_gemma(message):
 
         return f"AI Error: {error}"
 
+def get_meal_suggestions(
+    pantry_items,
+    meal_type,
+    servings,
+    preference
+):
 
-# Temporary test
-if __name__ == "__main__":
+    if len(pantry_items) == 0:
+        return (
+            "Your pantry is empty. "
+            "Add some ingredients first."
+        )
 
-    answer = ask_gemma(
-        "Say hello and tell me one simple dish "
-        "I can make using eggs and tomatoes."
-    )
+    pantry_text = ""
 
-    print(answer)
+    for ingredient in pantry_items:
+
+        name = ingredient[1]
+        quantity = ingredient[2]
+        unit = ingredient[3]
+
+        pantry_text += (
+            f"- {name}: {quantity:g} {unit}\n"
+        )
+
+    prompt = f"""
+You are PantryPal, a practical AI kitchen assistant.
+
+The user currently has these ingredients:
+
+{pantry_text}
+
+The user wants:
+Meal type: {meal_type}
+Servings: {servings}
+Preference: {preference}
+
+Recommend exactly 3 suitable dishes.
+
+IMPORTANT RULES:
+
+1. Prioritize ingredients already available in the pantry.
+2. Do not claim an ingredient is available if it is not listed.
+3. Consider the quantities available.
+4. Clearly mention any important missing ingredients.
+5. Prefer simple and realistic home-cooked meals.
+6. Keep the answer concise.
+7. Do not invent pantry quantities.
+8. Do not tell the user to buy ingredients unless they are actually needed.
+
+For each dish use this format:
+
+### Dish Name
+
+Why it works:
+Short explanation.
+
+Uses from pantry:
+- ingredient
+- ingredient
+
+Missing:
+- ingredient
+OR
+None
+
+Quick method:
+Short cooking instructions.
+"""
+
+    return ask_gemma(prompt)

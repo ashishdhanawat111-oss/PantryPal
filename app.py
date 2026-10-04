@@ -23,6 +23,7 @@ from database import (
     purchase_grocery_item
 )
 
+from ai_service import get_meal_suggestions
 
 # ---------------- PAGE SETUP ----------------
 
@@ -420,23 +421,128 @@ elif page == "🍳 Cook":
     st.title("🍳 Cook")
 
     st.write(
-        "Choose how you want to cook."
+        "Let Pal help you decide what to make "
+        "using what's already in your kitchen."
     )
 
-    st.button(
-        "✨ What Can I Cook?",
-        use_container_width=True
+    # ==================================================
+    # WHAT CAN I COOK?
+    # ==================================================
+
+    st.subheader("✨ What Can I Cook?")
+
+    meal_type = st.selectbox(
+        "What are you planning?",
+        [
+            "Breakfast",
+            "Lunch",
+            "Dinner",
+            "Snack",
+            "Anything"
+        ]
     )
 
-    st.button(
-        "📖 Cook From My Recipes",
-        use_container_width=True
+    servings = st.number_input(
+        "How many people?",
+        min_value=1,
+        max_value=10,
+        value=2,
+        step=1
     )
 
-    st.button(
-        "🍽️ I Made Something",
-        use_container_width=True
+    preference = st.selectbox(
+        "What are you in the mood for?",
+        [
+            "Anything",
+            "Quick & Easy",
+            "Healthy",
+            "Comfort Food",
+            "High Protein",
+            "Use ingredients that may expire soon"
+        ]
     )
+
+    st.caption(
+        "Pal will check your current pantry "
+        "before suggesting meals."
+    )
+
+    if st.button(
+        "✨ Ask Pal",
+        use_container_width=True
+    ):
+
+        pantry_items = get_ingredients()
+
+        if len(pantry_items) == 0:
+
+            st.warning(
+                "Your pantry is empty. "
+                "Add some groceries first! 📦"
+            )
+
+        else:
+
+            with st.spinner(
+                "Pal is checking your kitchen... 🍳"
+            ):
+
+                suggestions = get_meal_suggestions(
+                    pantry_items,
+                    meal_type,
+                    servings,
+                    preference
+                )
+
+            st.session_state[
+                "meal_suggestions"
+            ] = suggestions
+
+    # Keep AI result visible after Streamlit reruns
+    if st.session_state.get(
+        "meal_suggestions"
+    ):
+
+        st.divider()
+
+        st.subheader(
+            "🤖 Pal's Suggestions"
+        )
+
+        st.markdown(
+            st.session_state[
+                "meal_suggestions"
+            ]
+        )
+
+    st.divider()
+
+    # ==================================================
+    # OTHER COOKING OPTIONS
+    # ==================================================
+
+    st.subheader(
+        "Other Ways to Cook"
+    )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        st.info(
+            "📖 **My Recipes**\n\n"
+            "Use one of your saved recipes "
+            "and automatically update your pantry."
+        )
+
+    with col2:
+
+        st.info(
+            "🍽️ **I Made Something**\n\n"
+            "Tell Pal what you cooked and let AI "
+            "estimate what ingredients were used.\n\n"
+            "Coming next 👀"
+        )
 
 
 # ==================================================
