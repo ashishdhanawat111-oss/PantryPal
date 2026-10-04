@@ -1,4 +1,5 @@
 import os
+import json
 
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
@@ -117,3 +118,90 @@ Short cooking instructions.
 """
 
     return ask_gemma(prompt)
+
+
+def estimate_cooked_ingredients(
+    meal_description,
+    pantry_items
+):
+
+    if meal_description.strip() == "":
+        return None
+
+    pantry_text = ""
+
+    for ingredient in pantry_items:
+
+        name = ingredient[1]
+        quantity = ingredient[2]
+        unit = ingredient[3]
+
+        pantry_text += (
+            f"- {name}: {quantity:g} {unit}\n"
+        )
+
+    prompt = f"""
+You are PantryPal, an AI kitchen assistant.
+
+The user says they cooked:
+
+"{meal_description}"
+
+Their current pantry contains:
+
+{pantry_text}
+
+Estimate which pantry ingredients were probably used
+and approximately how much was used.
+
+IMPORTANT RULES:
+
+1. Only include ingredients that exist in the pantry.
+2. Use the same ingredient names as the pantry.
+3. Use realistic quantities.
+4. Use only these units:
+   kg, g, L, ml, pieces, packets, tbsp, tsp
+5. Do not subtract anything yourself.
+6. The user will review your estimates before anything changes.
+7. Return ONLY valid JSON.
+8. Do not use markdown.
+9. Do not wrap the JSON in ```json.
+
+Return exactly this structure:
+
+{{
+    "dish": "dish name",
+    "ingredients": [
+        {{
+            "name": "ingredient name",
+            "quantity": 1,
+            "unit": "pieces"
+        }}
+    ]
+}}
+"""
+
+    response = ask_gemma(prompt)
+
+    try:
+
+        cleaned_response = response.strip()
+
+        if cleaned_response.startswith("```json"):
+            cleaned_response = cleaned_response[7:]
+
+        elif cleaned_response.startswith("```"):
+            cleaned_response = cleaned_response[3:]
+
+        if cleaned_response.endswith("```"):
+            cleaned_response = cleaned_response[:-3]
+
+        data = json.loads(
+            cleaned_response.strip()
+        )
+
+        return data
+
+    except Exception:
+
+        return None

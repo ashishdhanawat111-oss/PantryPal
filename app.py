@@ -23,7 +23,10 @@ from database import (
     purchase_grocery_item
 )
 
-from ai_service import get_meal_suggestions
+from ai_service import (
+    get_meal_suggestions,
+    estimate_cooked_ingredients
+)
 
 # ---------------- PAGE SETUP ----------------
 
@@ -543,8 +546,451 @@ elif page == "🍳 Cook":
             "estimate what ingredients were used.\n\n"
             "Coming next 👀"
         )
+    st.divider()
+
+    # ==================================================
+    # I MADE SOMETHING
+    # ==================================================
+
+    st.subheader("🍽️ I Made Something")
+
+    st.write(
+        "Already cooked something? "
+        "Tell Pal what you made."
+    )
+
+    meal_description = st.text_area(
+        "What did you make?",
+        placeholder=(
+            "Example: I made aloo paratha "
+            "for 2 people."
+        )
+    )
+
+    if st.button(
+        "🤖 Estimate Ingredients",
+        use_container_width=True
+    ):
+
+        if meal_description.strip() == "":
+
+            st.warning(
+                "Tell Pal what you cooked first."
+            )
+
+        else:
+
+            pantry_items = get_ingredients()
+
+            if len(pantry_items) == 0:
+
+                st.warning(
+                    "Your pantry is empty."
+                )
+
+            else:
+
+                with st.spinner(
+                    "Pal is estimating what you used... 🍳"
+                ):
+
+                    estimate = (
+                        estimate_cooked_ingredients(
+                            meal_description,
+                            pantry_items
+                        )
+                    )
+
+                if estimate is None:
+
+                    st.error(
+                        "Pal couldn't understand the "
+                        "ingredient estimates. Try again."
+                    )
+
+                else:
+
+                    st.session_state[
+                        "cooked_estimate"
+                    ] = estimate
+
+                    st.session_state[
+                    "review_ingredients"
+                    ] = estimate.get(
+                    "ingredients",
+                    []
+                    )                   
+
+                    st.rerun()
+    if st.session_state.get(
+        "cooked_estimate"
+    ):
+
+        estimate = st.session_state[
+            "cooked_estimate"
+        ]
+
+        st.write("### 🤖 Pal's Estimate")
+
+        dish_name = estimate.get(
+            "dish",
+            "Your meal"
+        )
+
+        st.write(
+            f"**Dish:** {dish_name}"
+        )
+
+        estimated_ingredients = estimate.get(
+            "ingredients",
+            []
+        )
+
+        if len(estimated_ingredients) == 0:
+
+            st.warning(
+                "Pal couldn't identify any pantry "
+                "ingredients used."
+            )
+
+        else:
+
+            st.caption(
+                "These are only estimates. "
+                "Nothing has been removed from "
+                "your pantry yet."
+            )
+
+            if "review_ingredients" not in st.session_state:
+
+                st.session_state[
+                    "review_ingredients"
+                ] = estimated_ingredients.copy()
+
+            review_ingredients = st.session_state[
+                "review_ingredients"
+            ]
+
+            edited_ingredients = []
+
+            for index, ingredient in enumerate(
+                review_ingredients
+            ):
+
+                name = ingredient.get(
+                    "name",
+                    "Unknown"
+                )
+
+                quantity = ingredient.get(
+                    "quantity",
+                    0
+                )
+
+                unit = ingredient.get(
+                    "unit",
+                    "pieces"
+                )
+
+                st.write(
+                    f"**{name.title()}**"
+                )
+
+                col1, col2, col3 = st.columns(
+                    [2, 2, 1]
+                )
+
+                with col1:
+
+                    edited_quantity = st.number_input(
+                        "Amount used",
+                        min_value=0.0,
+                        value=float(quantity),
+                        step=0.5,
+                        key=f"review_quantity_{index}"
+                    )
+
+                units = [
+                    "kg",
+                    "g",
+                    "L",
+                    "ml",
+                    "pieces",
+                    "packets",
+                    "tbsp",
+                    "tsp"
+                ]
+
+                with col2:
+
+                    default_index = (
+                        units.index(unit)
+                        if unit in units
+                        else 0
+                    )
+
+                    edited_unit = st.selectbox(
+                        "Unit",
+                        units,
+                        index=default_index,
+                        key=f"review_unit_{index}"
+                    )
+
+                with col3:
+
+                    st.write("Remove")
+
+                    if st.button(
+                        "🗑️",
+                        key=f"remove_review_{index}"
+                    ):
+
+                        st.session_state[
+                            "review_ingredients"
+                        ].pop(index)
+
+                        st.rerun()
+
+                edited_ingredients.append({
+                    "name": name,
+                    "quantity": edited_quantity,
+                    "unit": edited_unit
+                })
+
+                st.divider()
+            st.write(
+                "### ➕ Add Another Ingredient"
+            )
+
+            pantry_items = get_ingredients()
+
+            existing_names = {
+                ingredient.get(
+                    "name",
+                    ""
+                ).lower()
+                for ingredient in review_ingredients
+            }
+
+            available_pantry_items = [
+                ingredient
+                for ingredient in pantry_items
+                if ingredient[1].lower()
+                not in existing_names
+            ]
+
+            if len(available_pantry_items) == 0:
+
+                st.info(
+                    "All pantry ingredients are "
+                    "already in the list."
+                )
+
+            else:
+
+                pantry_names = [
+                    ingredient[1]
+                    for ingredient
+                    in available_pantry_items
+                ]
+
+                ingredient_to_add = st.selectbox(
+                    "Ingredient",
+                    pantry_names,
+                    key="ingredient_to_add"
+                )
+
+                selected_pantry_item = next(
+                    ingredient
+                    for ingredient
+                    in available_pantry_items
+                    if ingredient[1]
+                    == ingredient_to_add
+                )
+
+                pantry_unit = (
+                    selected_pantry_item[3]
+                )
+
+                add_col1, add_col2 = st.columns(2)
+
+                with add_col1:
+
+                    quantity_to_add = st.number_input(
+                        "Amount used",
+                        min_value=0.0,
+                        value=1.0,
+                        step=0.5,
+                        key="quantity_to_add"
+                    )
+
+                with add_col2:
+
+                    unit_to_add = st.selectbox(
+                        "Unit",
+                        [
+                            "kg",
+                            "g",
+                            "L",
+                            "ml",
+                            "pieces",
+                            "packets",
+                            "tbsp",
+                            "tsp"
+                        ],
+                        index=(
+                            [
+                                "kg",
+                                "g",
+                                "L",
+                                "ml",
+                                "pieces",
+                                "packets",
+                                "tbsp",
+                                "tsp"
+                            ].index(pantry_unit)
+                            if pantry_unit in [
+                                "kg",
+                                "g",
+                                "L",
+                                "ml",
+                                "pieces",
+                                "packets",
+                                "tbsp",
+                                "tsp"
+                            ]
+                            else 0
+                        ),
+                        key="unit_to_add"
+                    )
+
+                if st.button(
+                    "➕ Add Ingredient",
+                    use_container_width=True
+                ):
+
+                    st.session_state[
+                        "review_ingredients"
+                    ].append({
+                        "name": ingredient_to_add,
+                        "quantity": quantity_to_add,
+                        "unit": unit_to_add
+                    })
+
+                    st.rerun()
 
 
+            # ==================================================
+            # CONFIRM AND UPDATE PANTRY
+            # ==================================================
+
+            st.write("### ✅ Confirm Usage")
+
+            st.caption(
+                "Review everything carefully. "
+                "Pantry quantities will only change "
+                "after you confirm."
+            )
+
+            if st.button(
+                "✅ Confirm & Update Pantry",
+                use_container_width=True,
+                type="primary"
+            ):
+
+                validation_errors = []
+
+                pantry_items = get_ingredients()
+
+                for ingredient in edited_ingredients:
+
+                    name = ingredient["name"]
+                    quantity = ingredient["quantity"]
+                    unit = ingredient["unit"]
+
+                    matching_item = None
+
+                    for pantry_item in pantry_items:
+
+                        if (
+                            pantry_item[1].lower()
+                            == name.lower()
+                        ):
+                            matching_item = pantry_item
+                            break
+
+                    if matching_item is None:
+
+                        validation_errors.append(
+                            f"{name} is not in your pantry."
+                        )
+
+                        continue
+
+                    pantry_quantity = matching_item[2]
+                    pantry_unit = matching_item[3]
+
+                    converted_quantity = convert_quantity(
+                        quantity,
+                        unit,
+                        pantry_unit
+                    )
+
+                    if converted_quantity is None:
+
+                        validation_errors.append(
+                            f"Cannot convert {unit} to "
+                            f"{pantry_unit} for {name}."
+                        )
+
+                        continue
+
+                    if converted_quantity > pantry_quantity:
+
+                        validation_errors.append(
+                            f"Not enough {name}. "
+                            f"You have {pantry_quantity:g} "
+                            f"{pantry_unit}, but entered "
+                            f"{quantity:g} {unit}."
+                        )
+
+                if len(validation_errors) > 0:
+
+                    st.error(
+                        "Please fix these before confirming:"
+                    )
+
+                    for error in validation_errors:
+
+                        st.write(
+                            f"• {error}"
+                        )
+
+                else:
+
+                    for ingredient in edited_ingredients:
+
+                        reduce_ingredient_quantity(
+                            ingredient["name"],
+                            ingredient["quantity"],
+                            ingredient["unit"]
+                        )
+
+                    st.session_state.pop(
+                        "cooked_estimate",
+                        None
+                    )
+
+                    st.session_state.pop(
+                        "review_ingredients",
+                        None
+                    )
+
+                    st.success(
+                        "Pantry updated successfully! 🎉"
+                    )
+
+                    st.rerun()            
 # ==================================================
 # MY RECIPES
 # ==================================================
